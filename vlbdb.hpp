@@ -10,46 +10,54 @@ struct binder_impl;
 
 class binder_t;
 
-/* binding_unit_t is the largest granularity at which runtime-binding happens.
+/* binding_unit_t is the largest granularity at which runtime-binding
+ * happens.
  *
- * A binding_unit is created from a bitcode file.  Only functions defined in that
- * bitcode file can be specialized and compiled at runtime.
+ * A binding_unit is created from a bitcode file.  Only functions
+ * defined in that bitcode file can be specialized and compiled at
+ * runtime.
  *
- * Users will usually directly pass pointers to functions, and not function names.
- * Instead, ld.so is used to map from names in the bitcode to addresses.  The register
- * methods can be used to supplement that mapping.
+ * Users will usually directly pass pointers to functions, and not
+ * function names.  Instead, ld.so is used to map from names in the
+ * bitcode to addresses.  The register methods can be used to
+ * supplement that mapping.
  *
- * The binding_unit is more than just a runtime partial applier, however.  In
- * addition to caching specialization results, it also preserves backward-translation
- * information.  Thus, calls to specialized functions can be de-optimized into
- * calls of functions known to the binding_unit (and to LLVM).  This de-optimization
- * process is useful because it lets us replace callees with cached specializations,
- * and even inline some calls.
+ * The binding_unit is more than just a runtime partial applier,
+ * however.  In addition to caching specialization results, it also
+ * preserves backward-translation information.  Thus, calls to
+ * specialized functions can be de-optimized into calls of functions
+ * known to the binding_unit (and to LLVM).  This de-optimization
+ * process is useful because it lets us replace callees with cached
+ * specializations, and even inline some calls.
  *
- * Each function (native or specialized) may have some metadata associated with it.
- * Currently, the only metadata is the maximum number of automatically-specialized
- * arguments. It defaults to 0, but increasing that value can result in useful
- * implicit recursive specialization.
+ * Each function (native or specialized) may have some metadata
+ * associated with it.  Currently, the only metadata is the maximum
+ * number of automatically-specialized arguments.  It defaults to 0,
+ * but increasing that value can result in useful implicit recursive
+ * specialization.
  *
- * It's often the case that C functions receive values as pointers.  In order to 
- * better support specialization of such functions binding_unit have the ability
- * to mark certain address ranges as immutable (and thus subject to constant folding).
- * When the address is irrelevant, it is preferable to instead intern a byte range,
+ * It's often the case that C functions receive values as pointers.
+ * In order to better support specialization of such functions
+ * binding_unit have the ability to mark certain address ranges as
+ * immutable (and thus subject to constant folding).  When the address
+ * is irrelevant, it is preferable to instead intern a byte range,
  * which will increase the odds of successful caching.
  *
- * Finally, binding_units also have support for blocks, the clang/Apple extension.
- * These closures are internally represented as pointers to structures.  The specialized
- * parses these structures and ends up specializing calls in which the first argument
- * is an interned byte range.
+ * Finally, binding_units also have support for blocks, the
+ * clang/Apple extension.  These closures are internally represented
+ * as pointers to structures.  The specialized parses these structures
+ * and ends up specializing calls in which the first argument is an
+ * interned byte range.
  */
 
-/* binder_t is used to programmatically build the constant argument list to a given
- * function or block.
+/* binder_t is used to programmatically build the constant argument
+ * list to a given function or block.
  *
- * binding_unit provides some convenience template methods for known number and
- * types of arguments.  However, neither the template or the format-string methods
- * are well-suited to variable number or types of arguments.  The binder interface
- * is the most general interface, and the convenience methods are just that.
+ * binding_unit provides some convenience template methods for known
+ * number and types of arguments.  However, neither the template or
+ * the format-string methods are well-suited to variable number or
+ * types of arguments.  The binder interface is the most general
+ * interface, and the convenience methods are just that.
  */
 
 class binding_unit_t {
