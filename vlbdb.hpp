@@ -141,6 +141,7 @@ class binder_t {
         std::tr1::shared_ptr<binder_impl> impl;
         explicit binder_t (binder_impl *);
 public:
+        binder_t (const binder_t &);
         static binder_t create_from_unit(binding_unit_t &unit,
                                          void * function);
         void bind_uint (unsigned long long);
