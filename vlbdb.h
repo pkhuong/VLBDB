@@ -13,8 +13,9 @@ typedef struct vlbdb_binder * vlbdb_binder_t;
 vlbdb_unit_t vlbdb_unit_from_bitcode (const char *, void * context);
 void vlbdb_unit_destroy (vlbdb_unit_t);
 
-vlbdb_binder_t vlbdb_create_binder (vlbdb_unit_t, void *);
-vlbdb_binder_t vlbdb_create_block_binder (vlbdb_unit_t, void *);
+vlbdb_binder_t vlbdb_binder_create (vlbdb_unit_t, void *);
+vlbdb_binder_t vlbdb_binder_create_block (vlbdb_unit_t, void *);
+vlbdb_binder_t vlbdb_binder_copy (vlbdb_unit_t, void *);
 void vlbdb_binder_destroy (vlbdb_binder_t);
 
 void vlbdb_register_function (vlbdb_unit_t, void *, size_t, const char *);
