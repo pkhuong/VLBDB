@@ -143,32 +143,32 @@ class binder_t {
 public:
         static binder_t create_from_unit(binding_unit_t &unit,
                                          void * function);
-        void add_uint (unsigned long long);
-        void add_int (long long);
-        void add_fp (double);
-        void add_ptr (void *);
-        void add_range (const void *, size_t, bool intern = true);
+        void bind_uint (unsigned long long);
+        void bind_int (long long);
+        void bind_fp (double);
+        void bind_ptr (void *);
+        void bind_range (const void *, size_t, bool intern = true);
         void * specialize();
 
-        void add (unsigned char x);
-        void add (unsigned short x);
-        void add (unsigned int x);
-        void add (unsigned long x);
-        void add (unsigned long long x);
+        void bind (unsigned char x);
+        void bind (unsigned short x);
+        void bind (unsigned int x);
+        void bind (unsigned long x);
+        void bind (unsigned long long x);
         
-        void add (char x);
-        void add (short x);
-        void add (int x);
-        void add (long x);
-        void add (long long x);
+        void bind (char x);
+        void bind (short x);
+        void bind (int x);
+        void bind (long x);
+        void bind (long long x);
 
-        void add (double x);
-        void add (float x);
+        void bind (double x);
+        void bind (float x);
 
         template <typename T>
-        void add (T * x);
+        void bind (T * x);
         template <typename T>
-        void add (const T * x, size_t = sizeof(T), bool intern = true);
+        void bind (const T * x, size_t = sizeof(T), bool intern = true);
 };
 
 // Template implementation noise...
@@ -235,7 +235,7 @@ template <typename T, typename A1>
 void * binding_unit_t::specialize (T fun, const A1& arg1)
 {
         binder_t binder(create_binder(fun));
-        binder.add(arg1);
+        binder.bind(arg1);
         return binder.specialize();
 }
 
@@ -243,8 +243,8 @@ template <typename T, typename A1, typename A2>
 void * binding_unit_t::specialize (T fun, const A1& arg1, const A2 &arg2)
 {
         binder_t binder(create_binder(fun));
-        binder.add(arg1);
-        binder.add(arg2);
+        binder.bind(arg1);
+        binder.bind(arg2);
         return binder.specialize();
 }
 
@@ -253,9 +253,9 @@ void * binding_unit_t::specialize (T fun, const A1& arg1, const A2 &arg2,
                                  const A3 &arg3)
 {
         binder_t binder(create_binder(fun));
-        binder.add(arg1);
-        binder.add(arg2);
-        binder.add(arg3);
+        binder.bind(arg1);
+        binder.bind(arg2);
+        binder.bind(arg3);
         return binder.specialize();
 }
 
@@ -264,10 +264,10 @@ void * binding_unit_t::specialize (T fun, const A1& arg1, const A2 &arg2,
                                  const A3 &arg3, const A4 &arg4)
 {
         binder_t binder(create_binder(fun));
-        binder.add(arg1);
-        binder.add(arg2);
-        binder.add(arg3);
-        binder.add(arg4);
+        binder.bind(arg1);
+        binder.bind(arg2);
+        binder.bind(arg3);
+        binder.bind(arg4);
         return binder.specialize();
 }
 
@@ -282,7 +282,7 @@ template <typename T, typename A1>
 void * binding_unit_t::specialize_block (T block, const A1& arg1)
 {
         binder_t binder(create_block_binder(block));
-        binder.add(arg1);
+        binder.bind(arg1);
         return binder.specialize();
 }
 
@@ -290,8 +290,8 @@ template <typename T, typename A1, typename A2>
 void * binding_unit_t::specialize_block (T block, const A1& arg1, const A2 &arg2)
 {
         binder_t binder(create_block_binder(block));
-        binder.add(arg1);
-        binder.add(arg2);
+        binder.bind(arg1);
+        binder.bind(arg2);
         return binder.specialize();
 }
 
@@ -300,9 +300,9 @@ void * binding_unit_t::specialize_block (T block, const A1& arg1, const A2 &arg2
                                  const A3 &arg3)
 {
         binder_t binder(create_block_binder(block));
-        binder.add(arg1);
-        binder.add(arg2);
-        binder.add(arg3);
+        binder.bind(arg1);
+        binder.bind(arg2);
+        binder.bind(arg3);
         return binder.specialize();
 }
 
@@ -311,10 +311,10 @@ void * binding_unit_t::specialize_block (T block, const A1& arg1, const A2 &arg2
                                  const A3 &arg3, const A4 &arg4)
 {
         binder_t binder(create_block_binder(block));
-        binder.add(arg1);
-        binder.add(arg2);
-        binder.add(arg3);
-        binder.add(arg4);
+        binder.bind(arg1);
+        binder.bind(arg2);
+        binder.bind(arg3);
+        binder.bind(arg4);
         return binder.specialize();
 }
 
@@ -331,14 +331,14 @@ int binding_unit_t::register_range (const T * address, size_t size)
 }
 
 template <typename T>
-void binder_t::add (T * x)
+void binder_t::bind (T * x)
 {
-        return add_ptr((void*)x);
+        return bind_ptr((void*)x);
 }
 template <typename T>
-void binder_t::add (const T * x, size_t range, bool intern)
+void binder_t::bind (const T * x, size_t range, bool intern)
 {
-        return add_range((const void *)x, range, intern);        
+        return bind_range((const void *)x, range, intern);        
 }
 
 #endif
