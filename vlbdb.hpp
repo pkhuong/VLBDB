@@ -58,12 +58,10 @@
  * interface, and the convenience methods are just that.
  */
 
-struct binding_unit_impl;
-struct binder_impl;
-
 class binder_t;
 
 class binding_unit_t {
+        struct binding_unit_impl;
         std::tr1::shared_ptr<binding_unit_impl> impl;
         explicit binding_unit_t (binding_unit_impl *);
 public:
@@ -139,6 +137,7 @@ public:
 };
 
 class binder_t {
+        struct binder_impl;
         std::tr1::shared_ptr<binder_impl> impl;
         explicit binder_t (binder_impl *);
 public:
