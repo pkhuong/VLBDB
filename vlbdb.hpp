@@ -5,11 +5,6 @@
 #include <tr1/memory>
 #include <stdarg.h>
 
-struct binding_unit_impl;
-struct binder_impl;
-
-class binder_t;
-
 /* binding_unit_t is the largest granularity at which runtime-binding
  * happens.
  *
@@ -59,6 +54,11 @@ class binder_t;
  * types of arguments.  The binder interface is the most general
  * interface, and the convenience methods are just that.
  */
+
+struct binding_unit_impl;
+struct binder_impl;
+
+class binder_t;
 
 class binding_unit_t {
         std::tr1::shared_ptr<binding_unit_impl> impl;
