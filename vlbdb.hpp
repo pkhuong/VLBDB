@@ -2,6 +2,9 @@
  *
  */
 
+#ifndef VLBDB_HPP
+#define VLBDB_HPP
+
 #include <tr1/memory>
 #include <stdarg.h>
 
@@ -141,11 +144,11 @@ class binder_t {
 public:
         static binder_t create_from_unit(binding_unit_t &unit,
                                          void * function);
-        void addUInt (unsigned long long);
-        void addSInt (long long);
-        void addFP (double);
-        void addPtr (void *);
-        void addRange (const void *, size_t, bool intern = true);
+        void add_uint (unsigned long long);
+        void add_int (long long);
+        void add_fp (double);
+        void add_ptr (void *);
+        void add_range (const void *, size_t, bool intern = true);
         void * specialize();
 
         void add (unsigned char x);
@@ -331,10 +334,12 @@ int binding_unit_t::register_range (const T * address, size_t size)
 template <typename T>
 void binder_t::add (T * x)
 {
-        return addPtr((void*)x);
+        return add_ptr((void*)x);
 }
 template <typename T>
 void binder_t::add (const T * x, size_t range, bool intern)
 {
-        return addRange((const void *)x, range, intern);        
+        return add_range((const void *)x, range, intern);        
 }
+
+#endif
