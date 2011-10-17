@@ -8,6 +8,10 @@
 #include <tr1/memory>
 #include <stdarg.h>
 
+extern "C" {
+#include "vlbdb.h"
+}
+
 /* binding_unit_t is the largest granularity at which runtime-binding
  * happens.
  *
