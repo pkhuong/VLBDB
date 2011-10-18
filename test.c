@@ -33,10 +33,7 @@ void * make_adder (int x)
 int main ()
 {
         vlbdb_unit_t * unit = vlbdb_unit_from_bitcode("test.bc", NULL);
-        vlbdb_register_function(unit, test, 0, NULL);
-        vlbdb_register_function(unit, test_int_ptr, 0, NULL);
-        vlbdb_register_function(unit, funcall, 0, NULL);
-        vlbdb_register_function(unit, funcall_ptr, 0, NULL);
+        vlbdb_register_all_functions(unit);
 
         vlbdb_binder_t * binder = vlbdb_binder_create(unit, test);
         vlbdb_bind_int(binder, 42);
@@ -62,7 +59,6 @@ int main ()
         vlbdb_binder_destroy(binder);
 
         void * block = make_adder(33);
-        vlbdb_register_block(unit, block, 0);
         binder = vlbdb_binder_create_block(unit, block);
         int (*test6)(int) = vlbdb_specialize(binder);
         vlbdb_binder_destroy(binder);
