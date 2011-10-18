@@ -153,6 +153,53 @@ vlbdb_register_function_name (vlbdb_unit_t * unit, const char * name,
         return vlbdb_register_function(unit, NULL, nspecialize, name);
 }
 
+
+static std::pair<GlobalVariable *, bool>
+find_intern_range (vlbdb_unit_t * unit, void * ptr, size_t size)
+{
+        vector<unsigned char> contents((unsigned char*)ptr,
+                                       (unsigned char*)ptr+size);
+        if (exists(unit->interned_ranges, contents))
+                return std::make_pair(unit->interned_ranges[contents],
+                                      false);
+
+        Type * char_type = IntegerType::get(*unit->context, 8);
+        ArrayType * type = ArrayType::get(char_type, size);
+        Constant * llvm_contents;
+        {
+                vector<Constant *> constants(size);
+                for (size_t i = 0; i < size; i++)
+                        constants[i] = ConstantInt::get(char_type,
+                                                        contents[i]);
+                llvm_contents = ConstantArray::get(type, constants);
+        }
+        Twine name("constant");
+        GlobalVariable * var
+                = new GlobalVariable(*unit->module, type,
+                                     true, Function::InternalLinkage,
+                                     llvm_contents,
+                                     name);
+        unit->interned_ranges[contents] = var;
+        return std::make_pair(var, true);
+}
+
+int vlbdb_intern_range (vlbdb_unit_t * unit, void * ptr, size_t size)
+{
+        return find_intern_range(unit, ptr, size).second;
+}
+
+int vlbdb_register_range (vlbdb_unit_t * unit, void * ptr, size_t size)
+{
+        // not quite, we want to merge ranges, etc.
+        if (exists(unit->frozen_ranges, ptr))
+                return false;
+
+        GlobalVariable * var
+                = find_intern_range(unit, ptr, size).first;
+        unit->frozen_ranges[ptr] = var;
+        return true;
+}
+
 void vlbdb_bind_uint (vlbdb_binder_t * binder, unsigned long long x)
 {
         assert(binder->params != binder->fun_type->param_end());
@@ -178,6 +225,7 @@ void vlbdb_bind_ptr (vlbdb_binder_t * binder, void * x)
 {
         assert(binder->params != binder->fun_type->param_end());
         PointerType * ptr = dyn_cast<PointerType>(*binder->params);
+        assert(ptr);
         ++binder->params;
         Constant * arg = 0;
         if (x == NULL) {
@@ -194,6 +242,17 @@ void vlbdb_bind_ptr (vlbdb_binder_t * binder, void * x)
                 arg = ConstantExpr::getIntToPtr(addr, ptr);
         }
         binder->args.push_back(arg);
+}
+
+void vlbdb_bind_range(vlbdb_binder_t * binder, void * address, size_t size)
+{
+        assert(binder->params != binder->fun_type->param_end());
+        PointerType * ptr = dyn_cast<PointerType>(*binder->params);
+        assert(ptr);
+        ++binder->params;
+        GlobalVariable * var = find_intern_range(binder->unit,
+                                                 address, size).first;
+        binder->args.push_back(ConstantExpr::getBitCast(var, ptr));
 }
 
 void * vlbdb_specialize(vlbdb_binder_t * binder)
@@ -409,6 +468,108 @@ maybe_insert_call_target (vlbdb_unit_t * unit,
 
 // returns true if the instruction has been folded away
 // TODO: handle read into known-constant space
+static Constant *
+fold_load_from_global (vlbdb_unit_t * unit, LoadInst * load)
+{
+        PointerType * type = dyn_cast<PointerType>(load->getType());
+        if (!type) return NULL;
+        Constant * addr = dyn_cast<Constant>(load->getPointerOperand());
+        if (!addr) return NULL;
+        Constant * pun
+                = ConstantExpr::getBitCast(addr,
+                                           PointerType::getUnqual
+                                           (IntegerType::get(*unit->context,
+                                                             8*sizeof(void*))));
+        Constant * constant = ConstantFoldLoadFromConstPtr(pun, unit->target_data);
+        if (!constant) return NULL;
+        return ConstantExpr::getIntToPtr(constant, type);
+}
+
+static Constant *
+fold_load_from_memory (vlbdb_unit_t * unit, void * address, Type * type)
+{
+        if (!(type->isPrimitiveType() || type->isPointerTy()))
+                return NULL;
+        size_t type_size = unit->target_data->getTypeSizeInBits(type);
+        if (type_size > 64) return NULL;
+        IntegerType * bit_type = IntegerType::get(*unit->context, type_size);
+        ConstantInt * bits = ConstantInt::get(bit_type, *(size_t*)address);
+        if (type->isPointerTy())
+                return ConstantExpr::getIntToPtr(bits, type);
+        return ConstantExpr::getBitCast(bits, type);
+}
+
+static Constant *
+load_from_frozen_to_interned (vlbdb_unit_t * unit, GlobalVariable * var, size_t offset,
+                              Type * ptr_type)
+{
+        IntegerType * int32 = Type::getInt32Ty(*unit->context);
+        ConstantInt * llvm_offset = ConstantInt::get(int32, offset);
+        ConstantInt * zero = ConstantInt::get(int32, 0);
+        SmallVector<Constant *, 2> idx;
+        idx.push_back(zero);
+        idx.push_back(llvm_offset);
+        Constant * new_target = ConstantExpr::getGetElementPtr(var, idx);
+        return ConstantExpr::getBitCast(new_target, ptr_type);
+}
+
+static Constant *
+fold_load_from_frozen (vlbdb_unit_t * unit, LoadInst * load)
+{
+        Type * type = load->getType();
+        if (!type->isSized()) return NULL;
+        Constant * target = dyn_cast<Constant>(load->getPointerOperand());
+        if (!target) return NULL;
+        Constant * pun
+                = ConstantExpr::getPtrToInt(target,
+                                            IntegerType::get(*unit->context,
+                                                             8*sizeof(void*)));
+        if (ConstantExpr * expr = dyn_cast<ConstantExpr>(pun)) {
+                pun = ConstantFoldConstantExpression(expr, unit->target_data);
+                if (!pun) return NULL;
+        }
+        ConstantInt * addr = dyn_cast<ConstantInt>(pun);
+        if (!addr) return NULL;
+        void* address = (void*)addr->getLimitedValue();
+        map<void *, GlobalVariable*>::const_iterator it
+                = unit->frozen_ranges.lower_bound(address);
+
+        if (it == unit->frozen_ranges.end())  {
+                if (it == unit->frozen_ranges.begin())
+                        return NULL;
+                --it;
+        }
+        if (it->first > address) {
+                if (it == unit->frozen_ranges.begin())
+                        return NULL;
+                --it;
+        }
+        assert(it->first <= address);
+        GlobalVariable * var = it->second;
+        size_t load_size = unit->target_data->getTypeStoreSize(type);
+        size_t offset = (char*)address - (char*)(it->first);
+        size_t max_constant_size = 0;
+        {
+                PointerType * ptr = dyn_cast<PointerType>(var->getType());
+                assert(ptr);
+                ArrayType * data = dyn_cast<ArrayType>(ptr->getElementType());
+                assert(data);
+                size_t count = data->getNumElements();
+                max_constant_size = count - offset;
+        }
+        if (load_size > max_constant_size)
+                return NULL;
+
+        if (Constant * folded = fold_load_from_memory(unit, address, type))
+                return folded;
+
+        target = load_from_frozen_to_interned(unit, var,
+                                              offset, target->getType());
+        if (!target) return NULL;
+        load->setOperand(0, target);
+        return fold_load_from_global(unit, load);
+}
+
 static bool
 fold_instruction (vlbdb_unit_t * unit, Instruction * inst,
                   std::set<Instruction *> &worklist,
@@ -417,8 +578,16 @@ fold_instruction (vlbdb_unit_t * unit, Instruction * inst,
         if (inst->use_empty()) return false;
         Constant * constant 
                 = ConstantFoldInstruction(inst, unit->target_data);
-        if (!constant)
-                return false;
+        if (!constant) {
+                LoadInst * load = dyn_cast<LoadInst>(inst);
+                if (!load) return false;
+                constant = fold_load_from_global(unit, load);
+                if (!constant)
+                        constant = fold_load_from_frozen(unit, load);
+                if (!constant)
+                        return false;
+        }
+        assert(constant);
         maybe_insert_call_target(unit, constant, targets);
 
         for (Value::use_iterator use = inst->use_begin(),
@@ -467,7 +636,7 @@ process_call (vlbdb_unit_t * unit, CallInst * call)
 
         args.erase(args.begin(), args.begin()+nspecialized);
         Twine name("");
-        return CallInst::Create(specialized, args, name, call);
+        return CallInst::Create(specialized, args, "", call);
 }
 
 static bool

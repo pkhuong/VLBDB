@@ -21,6 +21,7 @@ typedef binder_impl       vlbdb_binder_t;
 
 using namespace llvm;
 using std::map;
+using std::set;
 using std::vector;
 
 struct specialization_key_t : std::pair<Function *, vector<Value *> >
@@ -63,6 +64,7 @@ typedef std::tr1::shared_ptr<specialization_info> specialization_info_t;
 
 struct binding_unit_impl
 {
+        typedef vector<unsigned char> bytestring;
         LLVMContext * context;
         Module * module;
         ExecutionEngine * engine;
@@ -72,6 +74,8 @@ struct binding_unit_impl
         map<void *, Function *> ptr_to_function;
         map<specialization_key_t, specialization_info_t> specializations;
         map<Function *, specialization_info_t> function_to_specialization;
+        map<bytestring, GlobalVariable *> interned_ranges;
+        map<void *, GlobalVariable *> frozen_ranges;
 
         binding_unit_impl (LLVMContext * context_, 
                            Module * module_,
@@ -108,6 +112,9 @@ static bool exists (const Map &map, const Key &key)
 {
         return map.find(key) != map.end();
 }
+
+static std::pair<GlobalVariable *, bool>
+find_intern_range (vlbdb_unit_t *, void *, size_t);
 
 static Function * 
 specialize_call (vlbdb_unit_t *, Function *, const vector<Value *> &);

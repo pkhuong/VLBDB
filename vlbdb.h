@@ -31,14 +31,13 @@ void * vlbdb_vspecializef(vlbdb_unit_t *, void * function, const char *, va_list
 void * vlbdb_block_specializef(vlbdb_unit_t *, void * function, const char *, ...);
 void * vlbdb_vblock_specializef(vlbdb_unit_t *, void * function, const char *, va_list);
 
-/* TODO */
 int vlbdb_intern_range (vlbdb_unit_t *, void *, size_t);
-int vlbdb_register_range (vlbdb_unit_t *, void *, size_t);
+int vlbdb_register_range (vlbdb_unit_t *, void *, size_t); /* TODO */
 
 void vlbdb_bind_uint(vlbdb_binder_t *, unsigned long long);
 void vlbdb_bind_int(vlbdb_binder_t *, long long);
 void vlbdb_bind_fp(vlbdb_binder_t *, double);
 void vlbdb_bind_ptr(vlbdb_binder_t *, void *);
-void vlbdb_bind_range(vlbdb_binder_t *, void *, size_t); /* TODO */
+void vlbdb_bind_range(vlbdb_binder_t *, void *, size_t);
 void * vlbdb_specialize(vlbdb_binder_t *);
 #endif
