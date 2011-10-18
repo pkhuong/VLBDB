@@ -110,6 +110,20 @@ vlbdb_binder_destroy (vlbdb_binder_t * binder)
         delete binder;
 }
 
+unsigned
+vlbdb_register_all_functions (vlbdb_unit_t * unit)
+{
+        unsigned count = 0;
+        for (Module::iterator it = unit->module->begin(),
+                     end = unit->module->end();
+             it != end; ++it, count++) {
+                std::string name(it->getNameStr());
+                vlbdb_register_function(unit, NULL, 0, name.c_str());
+        }
+
+        return count;
+}
+
 void 
 vlbdb_register_function (vlbdb_unit_t * unit, void * function,
                          size_t nspecialize, const char * name)

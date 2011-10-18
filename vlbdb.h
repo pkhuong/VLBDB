@@ -20,6 +20,7 @@ vlbdb_binder_t * vlbdb_binder_create_block (vlbdb_unit_t *, void *);
 vlbdb_binder_t * vlbdb_binder_copy (vlbdb_binder_t *);
 void vlbdb_binder_destroy (vlbdb_binder_t *);
 
+unsigned vlbdb_register_all_functions (vlbdb_unit_t *);
 void vlbdb_register_function (vlbdb_unit_t *, void *, size_t, const char *);
 void vlbdb_register_function_name (vlbdb_unit_t *, const char *, size_t);
 

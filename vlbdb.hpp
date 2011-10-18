@@ -79,6 +79,7 @@ public:
         binder_t create_block_binder(T block);
         binder_t create_block_binder(void * block);
 
+        unsigned register_all_functions();
         template <typename T>
         void register_function(T function, size_t metadata = 0, const char * = 0);
         void register_function(void * function, size_t metadata = 0, const char * = 0);
