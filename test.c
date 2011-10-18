@@ -24,6 +24,12 @@ int funcall_ptr (void ** ptr, int x)
         return ((int(*)(int))ptr[1])(x);
 }
 
+#include <Block.h>
+void * make_adder (int x)
+{
+        return Block_copy(^ (int y) {return x + y; });
+}
+
 int main ()
 {
         vlbdb_unit_t * unit = vlbdb_unit_from_bitcode("test.bc", NULL);
@@ -53,6 +59,12 @@ int main ()
         binder = vlbdb_binder_create(unit, funcall_ptr);
         vlbdb_bind_ptr(binder, (&test2)-1); //, 2*sizeof(test2));
         int (*test5)(int) = vlbdb_specialize(binder);
+        vlbdb_binder_destroy(binder);
+
+        void * block = make_adder(33);
+        vlbdb_register_block(unit, block, 0);
+        binder = vlbdb_binder_create_block(unit, block);
+        int (*test6)(int) = vlbdb_specialize(binder);
         vlbdb_binder_destroy(binder);
 
         printf("%p %p -- %i, %i\n", test2, test3, test2(4), test3(5));
