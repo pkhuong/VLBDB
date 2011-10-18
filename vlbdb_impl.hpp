@@ -109,15 +109,21 @@ static bool exists (const Map &map, const Key &key)
         return map.find(key) != map.end();
 }
 
-static void * 
+static Function * 
 specialize_call (vlbdb_unit_t *, Function *, const vector<Value *> &);
 
 static Function * 
 specialize_inner (vlbdb_unit_t *, const specialization_key_t &info,
                   size_t nspecialize);
 
+static Function *
+auto_specialize (vlbdb_unit_t * unit, const specialization_info_t &info,
+                 const vector<Constant *> &args,
+                 size_t &nspecialized);
+
 static bool
-optimize_function (vlbdb_unit_t *, Function *, const vector<Value *> &inlinable);
+optimize_function (vlbdb_unit_t *, Function *,
+                   const vector<Value *> &inlinable);
 
 static specialization_info_t
 find_specialization_info (vlbdb_unit_t *, Function *);

@@ -64,6 +64,7 @@ vlbdb_unit_from_bitcode (const char * file, void * context_)
 
         FunctionPassManager &fpm(unit->fpm);
         fpm.add(new TargetData(*engine->getTargetData()));
+        //fpm.add(createPromoteMemoryToRegisterPass());
         fpm.add(createSCCPPass());
         fpm.add(createAggressiveDCEPass());
         fpm.add(createBasicAliasAnalysisPass());
@@ -197,10 +198,14 @@ void vlbdb_bind_ptr (vlbdb_binder_t * binder, void * x)
 
 void * vlbdb_specialize(vlbdb_binder_t * binder)
 {
-        return specialize_call(binder->unit, binder->base, binder->args);
+        vlbdb_unit_t * unit = binder->unit;
+        Function * specialized = specialize_call(unit, binder->base, binder->args);
+        void * binary = unit->engine->getPointerToFunction(specialized);
+        unit->ptr_to_function[binary] = specialized;
+        return binary;
 }
 
-static void * 
+static Function * 
 specialize_call (vlbdb_unit_t * unit, Function * fun, const vector<Value *> &args)
 {
         assert(exists(unit->function_to_specialization, fun));
@@ -213,9 +218,7 @@ specialize_call (vlbdb_unit_t * unit, Function * fun, const vector<Value *> &arg
                 nspecialize -= args.size();
         else    nspecialize = 0;
         Function * specialized = specialize_inner(unit, key, nspecialize);
-        void * binary = unit->engine->getPointerToFunction(specialized);
-        unit->ptr_to_function[binary] = specialized;
-        return binary;
+        return specialized;
 }
 
 static Function *
@@ -290,6 +293,26 @@ find_specialization_info (vlbdb_unit_t * unit, void * fun)
                 return find_specialization_info(unit,
                                                 unit->ptr_to_function[fun]);
         return specialization_info_t();
+}
+
+static Function *
+auto_specialize (vlbdb_unit_t * unit, const specialization_info_t &info,
+                 const vector<Constant *> &args,
+                 size_t &nspecialized)
+{
+        specialization_key_t key(info->key);
+        vector<Value *> &key_args(key.second);
+        key_args.insert(key_args.end(), args.begin(), args.end());
+        size_t nauto_specialize = info->nauto_specialize;
+        for (nspecialized = args.size();
+             nspecialized > nauto_specialize;
+             key_args.pop_back(), nspecialized--) {
+                if (exists(unit->specializations, key))
+                        return unit->specializations[key]->specialized;
+        }
+
+        assert(nauto_specialize >= nspecialized);
+        return specialize_inner(unit, key, nauto_specialize - nspecialized);
 }
 
 // Aggressive constant propagation and selective inlining
@@ -408,7 +431,6 @@ fold_instruction (vlbdb_unit_t * unit, Instruction * inst,
         return true;
 }
 
-// TODO
 static CallInst *
 process_call (vlbdb_unit_t * unit, CallInst * call)
 {
@@ -425,10 +447,27 @@ process_call (vlbdb_unit_t * unit, CallInst * call)
 
         specialization_info_t info(find_specialization_info
                                    (unit, callee));
-        // find best specialization
-        // maybe specialize further
+        if (!info) return call;
+        vector<Constant *> constants;
+        vector<Value *> args;
+        {
+                bool constant_prefix = true;
+                for (size_t i = 0; i < call->getNumArgOperands(); i++) {
+                        Value * arg = call->getArgOperand(i);
+                        if (constant_prefix && isa<Constant>(arg))
+                                constants.push_back(dyn_cast<Constant>(arg));
+                        else    constant_prefix = false;
+                        args.push_back(arg);
+                }
+        }
+        size_t nspecialized = 0;
+        Function * specialized = auto_specialize(unit, info,
+                                                 constants, nspecialized);
+        if (!nspecialized) return call;
 
-        return call;
+        args.erase(args.begin(), args.begin()+nspecialized);
+        Twine name("");
+        return CallInst::Create(specialized, args, name, call);
 }
 
 static bool
