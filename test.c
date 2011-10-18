@@ -6,10 +6,10 @@ int test (int x, int y)
         return x+y;
 }
 
-int funcall (void * ptr, int x)
+int funcall (void * ptr, int x, int y)
 {
         //int(*fun)(int) = ptr;
-        return ((int(*)(int))ptr)(x);
+        return ((int(*)(int, int))ptr)(x, y);
 }
 
 int main ()
@@ -24,7 +24,8 @@ int main ()
         vlbdb_binder_destroy(binder);
 
         binder = vlbdb_binder_create(unit, funcall);
-        vlbdb_bind_ptr(binder, test2);
+        vlbdb_bind_ptr(binder, test);
+        vlbdb_bind_int(binder, 42);
         int (*test3)(int) = vlbdb_specialize(binder);
         vlbdb_binder_destroy(binder);
 
