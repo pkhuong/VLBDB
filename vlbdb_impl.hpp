@@ -66,6 +66,7 @@ struct binding_unit_impl
         LLVMContext * context;
         Module * module;
         ExecutionEngine * engine;
+        const TargetData * target_data;
         FunctionPassManager fpm;
 
         map<void *, Function *> ptr_to_function;
@@ -78,6 +79,7 @@ struct binding_unit_impl
                 : context(context_),
                   module(module_),
                   engine(engine_),
+                  target_data(engine->getTargetData()),
                   fpm(module)
         {}
 };
@@ -101,4 +103,26 @@ struct binder_impl
         }
 };
 
+template <typename Map, typename Key>
+static bool exists (const Map &map, const Key &key)
+{
+        return map.find(key) != map.end();
+}
+
+static void * 
+specialize_call (vlbdb_unit_t *, Function *, const vector<Value *> &);
+
+static Function * 
+specialize_inner (vlbdb_unit_t *, const specialization_key_t &info,
+                  size_t nspecialize);
+
+static bool
+optimize_function (vlbdb_unit_t *, Function *, const vector<Value *> &inlinable);
+
+static specialization_info_t
+find_specialization_info (vlbdb_unit_t *, Function *);
+static specialization_info_t
+find_specialization_info (vlbdb_unit_t *, void *);
+static Function *
+value_to_function (vlbdb_unit_t *, Value *);
 #endif

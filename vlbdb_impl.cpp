@@ -20,8 +20,11 @@
 
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/ExecutionEngine/JIT.h"
+#include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/Support/InstIterator.h"
 
 #include <map>
+#include <set>
 #include <vector>
 #include <utility>
 #include <string>
@@ -34,18 +37,7 @@
 
 #include "vlbdb_impl.hpp"
 
-static void * 
-specialize_call (vlbdb_unit_t *, Function *, const vector<Value *> &);
-
-static Function * 
-specialize_inner (vlbdb_unit_t *, const specialization_key_t &info);
-
-template <typename Map, typename Key>
-static bool exists (const Map &map, const Key &key)
-{
-        return map.find(key) != map.end();
-}
-
+// TODO: load all symbols in bitcode.
 vlbdb_unit_t * 
 vlbdb_unit_from_bitcode (const char * file, void * context_)
 {
@@ -208,21 +200,27 @@ void * vlbdb_specialize(vlbdb_binder_t * binder)
         return specialize_call(binder->unit, binder->base, binder->args);
 }
 
-void * 
+static void * 
 specialize_call (vlbdb_unit_t * unit, Function * fun, const vector<Value *> &args)
 {
         assert(exists(unit->function_to_specialization, fun));
-        specialization_key_t key(unit->function_to_specialization[fun]->key);
+        specialization_info_t info(unit->function_to_specialization[fun]);
+        specialization_key_t key(info->key);
         key.second.insert(key.second.end(), args.begin(), args.end());
 
-        Function * specialized = specialize_inner(unit, key);
+        size_t nspecialize = info->nauto_specialize;
+        if (nspecialize > args.size())
+                nspecialize -= args.size();
+        else    nspecialize = 0;
+        Function * specialized = specialize_inner(unit, key, nspecialize);
         void * binary = unit->engine->getPointerToFunction(specialized);
         unit->ptr_to_function[binary] = specialized;
         return binary;
 }
 
-Function *
-specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key)
+static Function *
+specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key,
+                  size_t nspecialize)
 {
         if (exists(unit->specializations, key))
                 return unit->specializations[key]->specialized;
@@ -230,7 +228,7 @@ specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key)
         Function * base = key.first;
         const vector<Value *> &args = key.second;
 
-        specialization_info_t info(new specialization_info(key, 0, 0));
+        specialization_info_t info(new specialization_info(key, nspecialize, 0));
 
         vector<Type *> remaining_types;
         vector<Argument *> remaining_args;
@@ -267,8 +265,261 @@ specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key)
         unit->specializations[key] = info;
         unit->function_to_specialization[specialized_fun] = info;
 
+        optimize_function(unit, specialized_fun, args);
+        verifyFunction(*specialized_fun);
         unit->fpm.run(*specialized_fun);
+
+        specialized_fun->dump();
 
         return specialized_fun;
 }
 
+static specialization_info_t
+find_specialization_info (vlbdb_unit_t * unit, Function * fun)
+{
+        if (exists(unit->function_to_specialization, fun))
+                return unit->function_to_specialization[fun];
+
+        return specialization_info_t();
+}
+
+static specialization_info_t
+find_specialization_info (vlbdb_unit_t * unit, void * fun)
+{
+        if (exists(unit->ptr_to_function, fun))
+                return find_specialization_info(unit,
+                                                unit->ptr_to_function[fun]);
+        return specialization_info_t();
+}
+
+// Aggressive constant propagation and selective inlining
+//  The only specialized optimisation pass (:
+//
+// The inlinable set makes this difficult to implement as a
+// FunctionPass
+//
+// Assume that all bblocks are dead and values constants.  All call
+// sites in the original Function are considered for inlining;
+// however, only callees that were in arguments or constant address
+// ranges will be inlined (others are still up for specialization).
+// 
+// This is most of SCCP and ADCE, with more agressive constant
+// propagation for memory accesses, and an iterative inlining pass.
+
+// Do this simply for now, no co-inductive process.
+// Just straightforward inductive cprop.
+
+static std::set<CallInst *> find_call_sites (Function * fun)
+{
+        std::set<CallInst *> ret;
+        for (inst_iterator it = inst_begin(fun), end = inst_end(fun);
+             it != end; ++it) {
+                CallInst * call = dyn_cast<CallInst>(&*it);
+                if (call)
+                        ret.insert(call);
+        }
+        return ret;
+}
+
+// Next two functions are probably heavy handed. Revisit.
+static Function *
+ptr_cast_to_function (vlbdb_unit_t * unit, Constant * constant)
+{
+retry:
+        if (!constant) return NULL;
+
+        if (Function * fun = dyn_cast<Function>(constant))
+                return fun;
+        if (ConstantInt * addr = dyn_cast<ConstantInt>(constant)) {
+                void* address = (void*)addr->getLimitedValue();
+                specialization_info_t info
+                        (find_specialization_info(unit, address));
+                if (!info)
+                        return NULL;
+                return info->specialized;
+        }
+        if (!constant->getType()->isPointerTy()) return NULL;
+
+        if (ConstantExpr * expr = dyn_cast<ConstantExpr>(constant)) {
+                if (expr->isCast()) {
+                        Value * operand = expr->getOperand(0);
+                        constant = dyn_cast<Constant>(operand);
+                        goto retry;
+                }
+        }
+
+        return NULL;
+}
+
+static Function *
+value_to_function (vlbdb_unit_t * unit, Value * value)
+{
+        if (!value) return NULL;
+        Constant * constant = dyn_cast<Constant>(value);
+        if (!constant) return NULL;
+
+        if (Function * fun = ptr_cast_to_function(unit, constant))
+                return fun;
+
+        if (ConstantExpr * expr = dyn_cast<ConstantExpr>(constant)) {
+                Constant * constant
+                        = ConstantFoldConstantExpression(expr,
+                                                         unit->target_data);
+                if (Function * fun = ptr_cast_to_function(unit, constant))
+                        return fun;
+        }
+
+        return NULL;
+}
+
+static bool
+maybe_insert_call_target (vlbdb_unit_t * unit,
+                          Value * value, std::set<Function *> &targets)
+{
+        Function * function = value_to_function(unit, value);
+        if (!function) return false;
+        if (specialization_info_t info
+            = find_specialization_info(unit, function))
+                return targets.insert(info->key.first).second;
+        return false;
+}
+
+// returns true if the instruction has been folded away
+// TODO: handle read into known-constant space
+static bool
+fold_instruction (vlbdb_unit_t * unit, Instruction * inst,
+                  std::set<Instruction *> &worklist,
+                  std::set<Function *> &targets)
+{
+        if (inst->use_empty()) return false;
+        Constant * constant 
+                = ConstantFoldInstruction(inst, unit->target_data);
+        if (!constant)
+                return false;
+        maybe_insert_call_target(unit, constant, targets);
+
+        for (Value::use_iterator use = inst->use_begin(),
+                     end = inst->use_end();
+             use != end; ++use)
+                worklist.insert(cast<Instruction>(*use));
+        worklist.erase(inst);
+        inst->replaceAllUsesWith(constant);
+        inst->eraseFromParent();
+        return true;
+}
+
+// TODO
+static CallInst *
+process_call (vlbdb_unit_t * unit, CallInst * call)
+{
+        Function * callee 
+                = value_to_function(unit, call->getCalledValue());
+        if (!callee) return call;
+        if (call->getCalledFunction() != callee) {
+                // Or we could flame the user.
+                if (callee->getType() != call->getCalledValue()->getType())
+                        return call;
+
+                call->setCalledFunction(callee);
+        }
+
+        specialization_info_t info(find_specialization_info
+                                   (unit, callee));
+        // find best specialization
+        // maybe specialize further
+
+        return call;
+}
+
+static bool
+inline_call_or_not (vlbdb_unit_t * unit, CallInst * call,
+                    const std::set<Function *> &targets)
+{
+        specialization_info_t info(find_specialization_info
+                                   (unit, call->getCalledFunction()));
+        return (info && exists(targets, info->key.first));
+}
+
+static void
+insert_basic_block_in_list (BasicBlock * bb, std::set<Instruction *> &worklist)
+{
+        for (BasicBlock::iterator inst = bb->begin(), end = bb->end();
+             inst != end; ++inst)
+                worklist.insert(&*inst);
+}
+
+static void
+insert_new_basic_blocks_in_list (Function * fun, std::set<BasicBlock *> &known,
+                                 std::set<Instruction *> &worklist)
+{
+        for (Function::iterator bb = fun->begin(), end = fun->end();
+             bb != end; ++bb)
+                if (known.insert(&*bb).second)
+                        insert_basic_block_in_list(bb, worklist);
+}
+
+static void
+inline_call (vlbdb_unit_t * unit, CallInst * call,
+             std::set<BasicBlock *> &known_bb,
+             std::set<Instruction *> &worklist)
+{
+        (void)unit;
+        BasicBlock * original_bb = call->getParent();
+        Function * fun = original_bb->getParent();
+
+        InlineFunctionInfo IFI(NULL, unit->target_data);
+        if (InlineFunction(call, IFI)) {
+                insert_basic_block_in_list(original_bb, worklist);
+                insert_new_basic_blocks_in_list(fun, known_bb, worklist);
+        }
+}
+
+static bool
+optimize_function (vlbdb_unit_t * unit, Function * fun,
+                   const vector<Value *> &args)
+{
+        std::set<CallInst *> inline_sites(find_call_sites(fun));
+        std::set<Function *> inlinable_targets;
+        for (size_t i = 0; i < args.size(); i++)
+                maybe_insert_call_target(unit, args[i], inlinable_targets);
+
+        std::set<BasicBlock *> known_bb;
+        std::set<Instruction *> worklist;
+
+        insert_new_basic_blocks_in_list(fun, known_bb, worklist);
+
+        bool any_change = false;
+        while (!worklist.empty()) {
+                Instruction * inst = *worklist.begin();
+                worklist.erase(worklist.begin());
+                if (fold_instruction(unit, inst, worklist,
+                                     inlinable_targets)) {
+                        any_change = true;
+                        continue;
+                }
+                CallInst * call = dyn_cast<CallInst>(inst);
+                if (!call) continue;
+
+                {
+                        CallInst * new_call = process_call(unit, call);
+                        if (new_call != call) {
+                                if (exists(inline_sites, call)) {
+                                        inline_sites.erase(call);
+                                        inline_sites.insert(new_call);
+                                }
+                                call->replaceAllUsesWith(new_call);
+                                call->eraseFromParent();
+                                call = new_call;
+                                any_change = true;
+                        }
+                }
+                if (exists(inline_sites, call) &&
+                    inline_call_or_not(unit, call, inlinable_targets)) {
+                        inline_sites.erase(call);
+                        inline_call(unit, call, known_bb, worklist);
+                        any_change = true;
+                }
+        }
+
+        return any_change;
+}
