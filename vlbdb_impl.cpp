@@ -90,6 +90,15 @@ vlbdb_binder_create (vlbdb_unit_t * unit, void * base)
 }
 
 vlbdb_binder_t *
+vlbdb_binder_create_block (vlbdb_unit_t * unit, void * ptr)
+{
+        Block_literal * block = (Block_literal*)ptr;
+        vlbdb_binder_t * binder = vlbdb_binder_create(unit, block->invoke);
+        vlbdb_bind_range(binder, ptr, block->descriptor->size);
+        return binder;
+}
+
+vlbdb_binder_t *
 vlbdb_binder_copy (vlbdb_binder_t * binder)
 {
         return new binder_impl(*binder);
@@ -153,6 +162,12 @@ vlbdb_register_function_name (vlbdb_unit_t * unit, const char * name,
         return vlbdb_register_function(unit, NULL, nspecialize, name);
 }
 
+void
+vlbdb_register_block (vlbdb_unit_t * unit, void * ptr, size_t nspecialize)
+{
+        Block_literal * block = (Block_literal*)ptr;
+        return vlbdb_register_function(unit, block->invoke, nspecialize+1, NULL);
+}
 
 static std::pair<GlobalVariable *, bool>
 find_intern_range (vlbdb_unit_t * unit, void * ptr, size_t size)
@@ -639,10 +654,10 @@ process_call (vlbdb_unit_t * unit, CallInst * call)
                                 if (ConstantExpr * expr = dyn_cast<ConstantExpr>(con)) {
                                         if (Constant * optimized
                                             = (ConstantFoldConstantExpression
-                                               (expr, info->target_data)))
+                                               (expr, unit->target_data)))
                                                 con = optimized;
                                 }
-                                constants.push_back();
+                                constants.push_back(con);
                         } else {
                                 constant_prefix = false;
                         }

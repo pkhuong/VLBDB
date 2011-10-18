@@ -107,6 +107,25 @@ struct binder_impl
         }
 };
 
+// see http://clang.llvm.org/docs/Block-ABI-Apple.txt
+
+struct Block_literal {
+        void *isa; // initialized to &_NSConcreteStackBlock or &_NSConcreteGlobalBlock
+        int flags;
+        int reserved; 
+        void *invoke;
+        struct Block_descriptor {
+                unsigned long int reserved;	// NULL
+                unsigned long int size;         // sizeof(struct Block_literal)
+                // optional helper functions
+                void (*copy_helper)(void *dst, void *src);     // IFF (1<<25)
+                void (*dispose_helper)(void *src);             // IFF (1<<25)
+                // required ABI.2010.3.16
+                const char *signature;                         // IFF (1<<30)
+        } *descriptor;
+        // tail
+};
+
 template <typename Map, typename Key>
 static bool exists (const Map &map, const Key &key)
 {
