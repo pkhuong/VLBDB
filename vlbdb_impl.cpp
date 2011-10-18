@@ -270,7 +270,18 @@ specialize_call (vlbdb_unit_t * unit, Function * fun, const vector<Value *> &arg
         assert(exists(unit->function_to_specialization, fun));
         specialization_info_t info(unit->function_to_specialization[fun]);
         specialization_key_t key(info->key);
-        key.second.insert(key.second.end(), args.begin(), args.end());
+        for (size_t i = 0; i < args.size(); i++) {
+                Value * arg = args[i];
+                if (ConstantExpr * expr = dyn_cast<ConstantExpr>(arg)) {
+                        Constant * opt = ConstantFoldConstantExpression(expr,
+                                                                        unit->target_data);
+                        if (opt)
+                                key.second.push_back(opt);
+                        else    key.second.push_back(arg);
+                } else {
+                        key.second.push_back(arg);
+                }
+        }
 
         size_t nspecialize = info->nauto_specialize;
         if (nspecialize > args.size())
@@ -623,9 +634,18 @@ process_call (vlbdb_unit_t * unit, CallInst * call)
                 bool constant_prefix = true;
                 for (size_t i = 0; i < call->getNumArgOperands(); i++) {
                         Value * arg = call->getArgOperand(i);
-                        if (constant_prefix && isa<Constant>(arg))
-                                constants.push_back(dyn_cast<Constant>(arg));
-                        else    constant_prefix = false;
+                        if (constant_prefix && isa<Constant>(arg)) {
+                                Constant * con = dyn_cast<Constant>(arg);
+                                if (ConstantExpr * expr = dyn_cast<ConstantExpr>(con)) {
+                                        if (Constant * optimized
+                                            = (ConstantFoldConstantExpression
+                                               (expr, info->target_data)))
+                                                con = optimized;
+                                }
+                                constants.push_back();
+                        } else {
+                                constant_prefix = false;
+                        }
                         args.push_back(arg);
                 }
         }
