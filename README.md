@@ -25,7 +25,8 @@ native-code function, optimised to exploit the known arguments.
 In addition to constant values, VLBDB also supports constant folding
 through pointers to constant data.
 
-# What does it do
+What does it do
+---------------
 
 In addition to the obvious constant propagation, dead code
 elimination, etc. that follows from known constant arguments, VLBDB
@@ -56,14 +57,14 @@ it increases the set of compatible extant specialisations, and
 improves the effectiveness of the internal memoisation.
 
 Using the library
------------------
+=================
 
 Using VLBDB is currently a two-step process.  First, bitcode must be
 generated; then, a C or C++ program, linked to VLBDB, loads the
 bitcode file and calls specialized versions of functions in the
 bitcode file.
 
-# Generating bitcode
+## Generating bitcode
 
 Generating bitcode instead of object files is an essential element of
 LLVM's lifelong program analysis strategy.  If you use `clang`, you
@@ -76,21 +77,21 @@ LLVM's link-time optimisations work with bitcode files.  Under
 
     llvm-gcc [...] -flto -o foo.bc
 
-# Using VLBDB
+## Using VLBDB
 
 VLBDB revolves around the VLBDB binding unit.  A VLBDB unit is very
 much like a compilation unit, but at runtime: functions or data in a
 given unit can be inlined, constant-folded, etc., while references
 leaving the current VLBDB unit can only be compiled naively.
 
-## Registering metadata
+### Registering metadata
 
 In order to maximise the unit's usefulness, it maps addresses and
 values in the program to constants or functions in the unit.
 Metadata for specialized functions is automatically generated to
 ensure that specialized functions can be specialized further.
 
-### Registering functions
+#### Registering functions
 
 However, the mapping must still be seeded with functions to
 specialize.  `register_function` maps a pointer to the corresponding
@@ -107,7 +108,7 @@ Finally, `register_all_functions` will attempt to register all the
 functions in the bitcode file, using dynamic loading machinery, again,
 to map names to addresses.
 
-### Registering constant data
+#### Registering constant data
 
 Constant arguments of primitive types are enough to go very far.
 However, particularly when working with circular structure, it's very
@@ -130,7 +131,7 @@ disadvantage of this option is that identical ranges in different
 addresses will not be merged, and that the range must not be released
 or modified.
 
-## Specializing functions
+### Specializing functions
 
 In order to hide LLVM's heavy machinery, specialized functions are
 constructed with an opaque VLBDB binder.  A binder is created from an
@@ -147,7 +148,7 @@ returns a new function that's partially applied, and optimised.
 
 Finally, the binder must be destroyed.
 
-# Block support
+## Block support
 
 Apple introduced lexical closures for C, C++, and Objective-C, as
 blocks.  They are implemented as pointers to self-describing
