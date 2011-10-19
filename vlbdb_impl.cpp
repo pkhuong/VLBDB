@@ -117,6 +117,9 @@ vlbdb_register_all_functions (vlbdb_unit_t * unit)
         for (Module::iterator it = unit->module->begin(),
                      end = unit->module->end();
              it != end; ++it, count++) {
+                Function * fun = &*it;
+                if (fun->isDeclaration()) continue;
+                if (!fun->hasExternalLinkage()) continue;
                 std::string name(it->getNameStr());
                 vlbdb_register_function(unit, NULL, 0, name.c_str());
         }
@@ -129,7 +132,10 @@ vlbdb_register_function (vlbdb_unit_t * unit, void * function,
                          size_t nspecialize, const char * name)
 {
         assert(function || name);
-        if (exists(unit->ptr_to_function, function)) {
+        if (function == NULL)
+                function = dlsym(RTLD_DEFAULT, name);
+
+        if (function && exists(unit->ptr_to_function, function)) {
                 Function * LF = unit->ptr_to_function[function];
                 specialization_info_t info(unit->function_to_specialization[LF]);
                 info->nauto_specialize = std::max(info->nauto_specialize,
@@ -141,11 +147,7 @@ vlbdb_register_function (vlbdb_unit_t * unit, void * function,
                 Dl_info info;
                 assert(dladdr(function, &info));
                 name = info.dli_sname;
-                if (!name) name = "";
         }
-
-        if (function == NULL)
-                function = dlsym(RTLD_DEFAULT, name);
 
         Function * LF = unit->module->getFunction(name);
         if (!LF) {
