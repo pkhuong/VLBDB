@@ -7,7 +7,7 @@ like C, C++ or Fortran.  The latter goal is achieved by exploiting
 LLVM's infrastructure; the former is achieved by hiding all of LLVM
 behind a minimal interface.
 
-*WARNING* this is extremely experimental code.  I'm currently focusing
+_WARNING_ this is extremely experimental code.  I'm currently focusing
 on getting code generation and optimization right.  Work on fast
 compilation, robustness, memory management, etc. will come later.
 
@@ -15,7 +15,7 @@ Runtime Specialisation
 ----------------------
 
 VLBDB only supports a limited form of runtime specialisation: the
-*first* (few) arguments of functions can be specified to be constants.
+_first_ (few) arguments of functions can be specified to be constants.
 In other words, it only implements partial application with constants.
 However, unlike partial application in most functional languages,
 partial application in VLBDB is followed by a constant-folding and
@@ -25,7 +25,35 @@ native-code function, optimised to exploit the known arguments.
 In addition to constant values, VLBDB also supports constant folding
 through pointers to constant data.
 
-### What does it do
+# What does it do
+
+In addition to the obvious constant propagation, dead code
+elimination, etc. that follows from known constant arguments, VLBDB
+automatically specializes and inlines calls.
+
+Inlining is strongly restricted to ensure termination and avoid space
+explosions.  Only calls originally in the function can be inlined
+(i.e., no recursive inlining).  Moreover, only calls to functions that
+were constant-folded in can be inlined (i.e., calls that were known in
+the original remain out-of-line).
+
+Automatic specialization is similarly restricted.  With each function,
+a maximum number of autospecialised argument is associated.  The
+(safe) default is 0, except for block functions, for which it's 1 (the
+environment argument).  New specialisations are only recursively
+created for up to that many constant arguments.  However, extent
+specialisations will always be exploited: the one with the most
+(corresponding) constant arguments is used.  In particular, this means
+that recursive calls that preserve constant arguments are simplified
+into recursive calls to the specialized function.
+
+Specialisations are keyed on *all* the constant arguments, not only
+the last set.  This ensures that there is no difference between
+specializing a function's first argument, and then specialising the
+specialised function again, versus specialising the same function's
+arguments all at once.  The additional sharing is doubly beneficial:
+it increases the set of compatible extant specialisations, and
+improves the effectiveness of the internal memoisation.
 
 Using the library
 -----------------
@@ -35,7 +63,7 @@ generated; then, a C or C++ program, linked to VLBDB, loads the
 bitcode file and calls specialized versions of functions in the
 bitcode file.
 
-### Generating bitcode
+# Generating bitcode
 
 Generating bitcode instead of object files is an essential element of
 LLVM's lifelong program analysis strategy.  If you use `clang`, you
@@ -48,7 +76,7 @@ LLVM's link-time optimisations work with bitcode files.  Under
 
     llvm-gcc [...] -flto -o foo.bc
 
-### Using VLBDB
+# Using VLBDB
 
 VLBDB revolves around the VLBDB binding unit.  A VLBDB unit is very
 much like a compilation unit, but at runtime: functions or data in a
@@ -62,7 +90,7 @@ values in the program to constants or functions in the unit.
 Metadata for specialized functions is automatically generated to
 ensure that specialized functions can be specialized further.
 
-# Registering functions
+### Registering functions
 
 However, the mapping must still be seeded with functions to
 specialize.  `register_function` maps a pointer to the corresponding
@@ -79,7 +107,7 @@ Finally, `register_all_functions` will attempt to register all the
 functions in the bitcode file, using dynamic loading machinery, again,
 to map names to addresses.
 
-# Registering constant data
+### Registering constant data
 
 Constant arguments of primitive types are enough to go very far.
 However, particularly when working with circular structure, it's very
@@ -119,7 +147,7 @@ returns a new function that's partially applied, and optimised.
 
 Finally, the binder must be destroyed.
 
-### Block support
+# Block support
 
 Apple introduced lexical closures for C, C++, and Objective-C, as
 blocks.  They are implemented as pointers to self-describing
