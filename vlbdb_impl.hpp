@@ -10,6 +10,7 @@
 #include <map>
 #include <vector>
 #include <utility>
+#include <assert.h>
 
 #define VLBDB_IN_IMPLEMENTATION
 struct binding_unit_impl;
@@ -100,7 +101,7 @@ struct binder_impl
                      void * function)
                 : unit(unit_)
         {
-                vlbdb_register_function(unit, function, 0, NULL);
+                assert(unit->ptr_to_function.find(function) != unit->ptr_to_function.end());
                 base = unit->ptr_to_function[function];
                 fun_type = base->getFunctionType();
                 params = fun_type->param_begin();

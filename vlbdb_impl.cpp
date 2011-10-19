@@ -141,7 +141,12 @@ vlbdb_register_function (vlbdb_unit_t * unit, void * function,
                 Dl_info info;
                 assert(dladdr(function, &info));
                 name = info.dli_sname;
+                if (!name) name = "";
         }
+
+        if (function == NULL)
+                function = dlsym(RTLD_DEFAULT, name);
+
         Function * LF = unit->module->getFunction(name);
         if (!LF) {
                 int status = 0;
