@@ -12,6 +12,11 @@ on getting code generation and optimization right.  Work on fast
 compilation, robustness, memory management, etc. will come later.
 Also, the C++ interface simply doesn't exist yet.
 
+See `pike-regex.c` for a clumsy example: it takes Pike's tiny
+sub-regular-expression matcher, and compiles it straightforwardly to
+native code.  The clumsiness is mostly caused by the fact that next to
+none of the convenience functions have been implemented.
+
 Runtime Specialisation
 ----------------------
 
