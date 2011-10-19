@@ -76,12 +76,12 @@ Generating bitcode instead of object files is an essential element of
 LLVM's lifelong program analysis strategy.  If you use `clang`, you
 can simply execute
 
-    clang [regular flags] -emit-llvm -o foo.bc
+    clang [regular flags] -c -emit-llvm -o foo.bc
 
 LLVM's link-time optimisations work with bitcode files.  Under
 `llvm-gcc`, it's instead necessary to
 
-    llvm-gcc [...] -flto -o foo.bc
+    llvm-gcc [...] -c -flto -o foo.bc
 
 ## Using VLBDB
 
