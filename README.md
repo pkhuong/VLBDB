@@ -10,6 +10,7 @@ behind a minimal interface.
 _WARNING_ this is extremely experimental code.  I'm currently focusing
 on getting code generation and optimization right.  Work on fast
 compilation, robustness, memory management, etc. will come later.
+Also, the C++ interface simply doesn't exist yet.
 
 Runtime Specialisation
 ----------------------
