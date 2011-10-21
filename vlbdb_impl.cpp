@@ -77,10 +77,28 @@ vlbdb_unit_from_bitcode (const char * file, void * context_)
         return unit;
 }
 
-void 
-vlbdb_unit_destroy (vlbdb_unit_t * unit)
+void
+vlbdb_unit_retain (vlbdb_unit_t * unit)
+{
+        // sticky value
+        if (unit->refcount == -1UL) return;
+        assert(__sync_fetch_and_add(&unit->refcount, 1) > 0);
+}
+
+static void 
+unit_destroy (vlbdb_unit_t * unit)
 {
         delete unit;
+}
+
+int
+vlbdb_unit_release (vlbdb_unit_t * unit)
+{
+        if (unit->refcount == -1UL) return 0;
+        if (__sync_fetch_and_sub(&unit->refcount, 1) > 1)
+                return 0;
+        unit_destroy(unit);
+        return 1;
 }
 
 vlbdb_binder_t * 
@@ -104,10 +122,28 @@ vlbdb_binder_copy (vlbdb_binder_t * binder)
         return new binder_impl(*binder);
 }
 
-void 
-vlbdb_binder_destroy (vlbdb_binder_t * binder)
+void
+vlbdb_binder_retain (vlbdb_binder_t * binder)
+{
+        // sticky value
+        if (binder->refcount == -1UL) return;
+        assert(__sync_fetch_and_add(&binder->refcount, 1) > 0);
+}
+
+static void 
+binder_destroy (vlbdb_binder_t * binder)
 {
         delete binder;
+}
+
+int
+vlbdb_binder_release (vlbdb_binder_t * binder)
+{
+        if (binder->refcount == -1UL) return 0;
+        if (__sync_fetch_and_sub(&binder->refcount, 1) > 1)
+                return 0;
+        binder_destroy(binder);
+        return 1;
 }
 
 unsigned
@@ -211,9 +247,7 @@ void * vlbdb_vspecializef (vlbdb_unit_t * unit, void * function,
 {
         vlbdb_binder_t * binder = vlbdb_binder_create(unit, function);
         vlbdb_vbindf(binder, format, values);
-        void * ret = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-        return ret;
+        return vlbdb_specialize(binder);
 }
 
 void * vlbdb_vblock_specializef (vlbdb_unit_t * unit, void * block, 
@@ -221,17 +255,13 @@ void * vlbdb_vblock_specializef (vlbdb_unit_t * unit, void * block,
 {
         vlbdb_binder_t * binder = vlbdb_binder_create_block(unit, block);
         vlbdb_vbindf(binder, format, values);
-        void * ret = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-        return ret;
+        return vlbdb_specialize(binder);
 }
 
 void * vlbdb_block_specialize(vlbdb_unit_t * unit, void * block)
 {
         vlbdb_binder_t * binder = vlbdb_binder_create_block(unit, block);
-        void * ret = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-        return ret;        
+        return vlbdb_specialize(binder);
 }
 
 static std::pair<GlobalVariable *, bool>
@@ -445,13 +475,20 @@ void vlbdb_vbindf (vlbdb_binder_t * binder, const char * format, va_list values)
         va_end(values);
 }
 
-void * vlbdb_specialize(vlbdb_binder_t * binder)
+void * vlbdb_specialize_retain (vlbdb_binder_t * binder)
 {
         vlbdb_unit_t * unit = binder->unit;
         Function * specialized = specialize_call(unit, binder->base, binder->args);
         void * binary = unit->engine->getPointerToFunction(specialized);
         unit->ptr_to_function[binary] = specialized;
         return binary;
+}
+
+void * vlbdb_specialize (vlbdb_binder_t * binder)
+{
+        void * ret = vlbdb_specialize_retain(binder);
+        vlbdb_binder_release(binder);
+        return ret;
 }
 
 static Function * 

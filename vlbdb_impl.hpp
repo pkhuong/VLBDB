@@ -66,6 +66,7 @@ typedef std::tr1::shared_ptr<specialization_info> specialization_info_t;
 struct binding_unit_impl
 {
         typedef vector<unsigned char> bytestring;
+        size_t refcount;
         LLVMContext * context;
         Module * module;
         ExecutionEngine * engine;
@@ -81,7 +82,8 @@ struct binding_unit_impl
         binding_unit_impl (LLVMContext * context_, 
                            Module * module_,
                            ExecutionEngine * engine_)
-                : context(context_),
+                : refcount(1),
+                  context(context_),
                   module(module_),
                   engine(engine_),
                   target_data(engine->getTargetData()),
@@ -91,6 +93,7 @@ struct binding_unit_impl
 
 struct binder_impl
 {
+        size_t refcount;
         binding_unit_impl * unit;
         Function * base;
         vector<Value *> args;
@@ -99,12 +102,20 @@ struct binder_impl
 
         binder_impl (binding_unit_impl * unit_,
                      void * function)
-                : unit(unit_)
+                : refcount(1),
+                  unit(unit_)
         {
-                assert(unit->ptr_to_function.find(function) != unit->ptr_to_function.end());
+                assert(unit->ptr_to_function.find(function)
+                       != unit->ptr_to_function.end());
+                vlbdb_unit_retain(unit);
                 base = unit->ptr_to_function[function];
                 fun_type = base->getFunctionType();
                 params = fun_type->param_begin();
+        }
+
+        ~binder_impl () 
+        {
+                vlbdb_unit_release(unit);
         }
 };
 
