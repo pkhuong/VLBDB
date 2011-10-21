@@ -81,7 +81,7 @@ specialize_call (vlbdb_unit_t * unit, Function * fun, const vector<Value *> &arg
         return specialized;
 }
 
-Function *
+static Function *
 specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key,
                   size_t nspecialize)
 {
@@ -137,7 +137,7 @@ specialize_inner (vlbdb_unit_t * unit, const specialization_key_t &key,
         return specialized_fun;
 }
 
-specialization_info_t
+static specialization_info_t
 find_specialization_info (vlbdb_unit_t * unit, Function * fun)
 {
         if (exists(unit->function_to_specialization, fun))
@@ -146,7 +146,7 @@ find_specialization_info (vlbdb_unit_t * unit, Function * fun)
         return specialization_info_t();
 }
 
-specialization_info_t
+static specialization_info_t
 find_specialization_info (vlbdb_unit_t * unit, void * fun)
 {
         if (exists(unit->ptr_to_function, fun))
@@ -155,7 +155,7 @@ find_specialization_info (vlbdb_unit_t * unit, void * fun)
         return specialization_info_t();
 }
 
-Function *
+static Function *
 auto_specialize (vlbdb_unit_t * unit, const specialization_info_t &info,
                  const vector<Constant *> &args,
                  size_t &nspecialized)
@@ -234,7 +234,7 @@ retry:
         return NULL;
 }
 
-Function *
+static Function *
 value_to_function (vlbdb_unit_t * unit, Value * value)
 {
         if (!value) return NULL;
@@ -492,7 +492,7 @@ inline_call (vlbdb_unit_t * unit, CallInst * call,
         }
 }
 
-bool
+static bool
 optimize_function (vlbdb_unit_t * unit, Function * fun,
                    const vector<Value *> &args)
 {
