@@ -92,7 +92,7 @@ unit_destroy (vlbdb_unit_t * unit)
 }
 
 int
-vlbdb_unit_release (vlbdb_unit_t * unit)
+vlbdb_unit_destroy (vlbdb_unit_t * unit)
 {
         if (unit->refcount == -1UL) return 0;
         if (__sync_fetch_and_sub(&unit->refcount, 1) > 1)
@@ -137,7 +137,7 @@ binder_destroy (vlbdb_binder_t * binder)
 }
 
 int
-vlbdb_binder_release (vlbdb_binder_t * binder)
+vlbdb_binder_destroy (vlbdb_binder_t * binder)
 {
         if (binder->refcount == -1UL) return 0;
         if (__sync_fetch_and_sub(&binder->refcount, 1) > 1)
@@ -487,7 +487,7 @@ void * vlbdb_specialize_retain (vlbdb_binder_t * binder)
 void * vlbdb_specialize (vlbdb_binder_t * binder)
 {
         void * ret = vlbdb_specialize_retain(binder);
-        vlbdb_binder_release(binder);
+        vlbdb_binder_destroy(binder);
         return ret;
 }
 

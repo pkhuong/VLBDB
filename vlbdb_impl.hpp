@@ -115,7 +115,7 @@ struct binder_impl
 
         ~binder_impl () 
         {
-                vlbdb_unit_release(unit);
+                vlbdb_unit_destroy(unit);
         }
 };
 
