@@ -39,11 +39,7 @@ matcher_t compile_match (char * regexp)
                 return compile_matchhere(regexp+1);
 
         matcher_t inner = compile_matchhere(regexp);
-        vlbdb_binder_t * binder = vlbdb_binder_create(unit, match_papply);
-        vlbdb_bind_ptr(binder, inner);
-        matcher_t matcher = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-        return matcher;
+        return vlbdb_specializef(unit, match_papply, "%p", inner);
 }
 
 /* matchhere: search for regexp at beginning of text */
@@ -80,22 +76,14 @@ int matchchar_papply(char constant, matcher_t k, char * text)
 
 matcher_t compile_matchhere (char * regexp)
 {
-        vlbdb_binder_t * binder = 0;
-        if (regexp[0] == '\0') {
-                binder = vlbdb_binder_create(unit, constant_papply);
-                vlbdb_bind_int(binder, 1);
-        } else if (regexp[1] == '*') {
-                matcher_t next = compile_matchhere(regexp+2);
-                return compile_matchstar(regexp[0], next);
-        } else {
-                matcher_t next = compile_matchhere(regexp+1);
-                binder = vlbdb_binder_create(unit, matchchar_papply);
-                vlbdb_bind_int(binder, regexp[0]);
-                vlbdb_bind_ptr(binder, next);
-        }
-        matcher_t matcher = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-        return matcher;
+        if (regexp[0] == '\0')
+                return vlbdb_specializef(unit, constant_papply, "%i", 1);
+        if (regexp[1] == '*')
+                return compile_matchstar(regexp[0], 
+                                         compile_matchhere(regexp+2));
+        
+        return vlbdb_specializef(unit, matchchar_papply, "%i%p",
+                                 regexp[0], compile_matchhere(regexp+1));
 }
 
 /* matchstar: search for c*regexp at beginning of text */
@@ -116,16 +104,9 @@ int matchstar_papply (char c, matcher_t k, char * text)
         return 0;
 }
 
-
 matcher_t compile_matchstar (char c, matcher_t k)
 {
-        vlbdb_binder_t * binder = vlbdb_binder_create(unit, matchstar_papply);
-        vlbdb_bind_int(binder, c);
-        vlbdb_bind_ptr(binder, k);
-        matcher_t matcher = vlbdb_specialize(binder);
-        vlbdb_binder_destroy(binder);
-
-        return matcher;
+        return vlbdb_specializef(unit, matchstar_papply, "%i%p", c, k);
 }
 
 #include <stdio.h>
