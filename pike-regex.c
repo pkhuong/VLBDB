@@ -115,7 +115,88 @@ int main ()
 {
         unit = vlbdb_unit_from_bitcode("pike-regex.bc", NULL);
         vlbdb_register_all_functions(unit);
-        matcher_t matcher = compile_match("as*b");
+
+        vlbdb_register_function(unit, match, 1, NULL);
+        vlbdb_register_function(unit, matchhere, 1, NULL);
+        vlbdb_register_function(unit, matchstar, 2, NULL);
+
+        char pattern[] = "as*b";
+        char test[] = "assssb";
+        char test2[] = "asss";
+
+        matcher_t lazy    = vlbdb_specializef(unit, match, "%*p",
+                                              (int)sizeof(pattern), pattern);
+/*
+ *  (gdb) x/19i 0x102300010
+ *  0x102300010:	push   %r14
+ *  0x102300012:	push   %rbx
+ *  0x102300013:	push   %rax
+ *  0x102300014:	mov    %rdi,%rbx
+ *  0x102300017:	mov    $0x102380010,%r14
+ *  0x102300021:	mov    %rbx,%rdi
+ *  0x102300024:	callq  *%r14
+ *  0x102300027:	mov    %eax,%ecx
+ *  0x102300029:	mov    $0x1,%eax
+ *  0x10230002e:	test   %ecx,%ecx
+ *  0x102300030:	jne    0x102300045
+ *  0x102300036:	xor    %eax,%eax
+ *  0x102300038:	cmpb   $0x0,(%rbx)
+ *  0x10230003b:	lea    0x1(%rbx),%rbx
+ *  0x10230003f:	jne    0x102300021
+ *  0x102300045:	add    $0x8,%rsp
+ *  0x102300049:	pop    %rbx
+ *  0x10230004a:	pop    %r14
+ *  0x10230004c:	retq   
+ *
+ *  (gdb) x/2i 0x102380010
+ *  0x102380010:	mov    $0x1023000c0,%r10
+ *  0x10238001a:	jmpq   *%r10
+ *
+ *  [...]
+ *
+ *  0x1023000c0:	push   %r15
+ *  0x1023000c2:	push   %r14
+ *  0x1023000c4:	push   %r12
+ *  0x1023000c6:	push   %rbx
+ *  0x1023000c7:	push   %rax
+ *  0x1023000c8:	mov    %rdi,%r15
+ *  0x1023000cb:	xor    %edx,%edx
+ *  0x1023000cd:	mov    $0x61,%dil
+ *  0x1023000d0:	mov    $0x102390010,%r8
+ *  0x1023000da:	mov    %dil,%bl
+ *  0x1023000dd:	mov    $0x1,%eax
+ *  0x1023000e2:	test   %bl,%bl
+ *  0x1023000e4:	je     0x102300125
+ *  0x1023000ea:	cmp    $0x1,%rdx
+ *  0x1023000ee:	jne    0x102300131
+ *  0x1023000f4:	jmpq   0x102300155
+ *  0x1023000f9:	xor    %eax,%eax
+ *  0x1023000fb:	test   %cl,%cl
+ *  0x1023000fd:	je     0x102300125
+ *  0x102300103:	lea    0x1(%rdx),%rsi
+ *  0x102300107:	mov    0x1(%r8,%rdx,1),%dil
+ *  0x10230010c:	xor    %eax,%eax
+ *  0x10230010e:	cmp    $0x2e,%bl
+ *  0x102300111:	mov    %rsi,%rdx
+ *  0x102300114:	je     0x1023000da
+ *  0x10230011a:	cmp    %cl,%bl
+ *  0x10230011c:	mov    %rsi,%rdx
+ *  0x10230011f:	je     0x1023000da
+ *  0x102300125:	add    $0x8,%rsp
+ *  0x102300129:	pop    %rbx
+ *  0x10230012a:	pop    %r12
+ *  0x10230012c:	pop    %r14
+ *  0x10230012e:	pop    %r15
+ *  0x102300130:	retq   
+ *
+ * [...]
+ *
+ *  It's specialised, but still not that good: inlining is useful.
+ *
+ */
+        printf("%p %i %i\n", lazy, lazy(test), lazy(test2));
+
+        matcher_t matcher = compile_match(pattern);
 
  /*
   *  (gdb) x/17i 0x1023001e0
@@ -137,8 +218,6 @@ int main ()
   *  0x102300218:	jne    0x1023001e3
   *  0x10230021e:	retq
   */
-        char test[] = "assssb";
-        char test2[] = "asss";
 
         printf("%p %i %i\n", matcher, matcher(test), matcher(test2));
 
