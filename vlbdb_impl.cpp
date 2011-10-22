@@ -154,7 +154,9 @@ vlbdb_register_all_functions (vlbdb_unit_t * unit)
                 if (fun->isDeclaration()) continue;
                 if (!fun->hasExternalLinkage()) continue;
                 std::string name(it->getNameStr());
-                vlbdb_register_function(unit, NULL, 0, name.c_str());
+                const char * cname = name.c_str();
+                if (void * function = dlsym(RTLD_DEFAULT, cname))
+                        vlbdb_register_function(unit, function, 0, cname);
         }
 
         return count;
@@ -169,6 +171,7 @@ vlbdb_register_function (vlbdb_unit_t * unit, void * function,
                 function = dlsym(RTLD_DEFAULT, name);
 
         if (function && exists(unit->ptr_to_function, function)) {
+                if (nspecialize == 0) return;
                 Function * LF = unit->ptr_to_function[function];
                 specialization_info_t info(unit->function_to_specialization[LF]);
                 info->nauto_specialize = std::max(info->nauto_specialize,
