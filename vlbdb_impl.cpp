@@ -54,7 +54,6 @@ static int destroy_base (T * obj)
         return 1;
 }
 
-// TODO: load all symbols in bitcode.
 vlbdb_unit_t * 
 vlbdb_unit_from_bitcode (const char * file, void * context_)
 {
