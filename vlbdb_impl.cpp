@@ -71,6 +71,8 @@ vlbdb_unit_from_bitcode (const char * file, void * context_)
         std::string ErrStr;
         ExecutionEngine * engine = (EngineBuilder(module)
                                     .setErrorStr(&ErrStr)
+                                    .setOptLevel(CodeGenOpt::Less)
+                                    .setRelocationModel(Reloc::Static)
                                     .create());
         if (!engine) {
                 fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
