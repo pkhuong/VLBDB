@@ -1,25 +1,18 @@
 #include "llvm/Type.h"
+#include "llvm/DerivedTypes.h"
 #include "llvm/Value.h"
+#include "llvm/Constant.h"
+#include "llvm/Constants.h"
 #include "llvm/Function.h"
 #include "llvm/BasicBlock.h"
 #include "llvm/Instruction.h"
 #include "llvm/Instructions.h"
 #include "llvm/Module.h"
 #include "llvm/LLVMContext.h"
-#include "llvm/Support/IRReader.h"
-#include "llvm/Support/IRBuilder.h"
-#include "llvm/PassManager.h"
-#include "llvm/Transforms/IPO/PassManagerBuilder.h"
-#include "llvm/Analysis/Passes.h"
 #include "llvm/Analysis/Verifier.h"
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Target/TargetData.h"
-#include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
-#include "llvm/ExecutionEngine/ExecutionEngine.h"
-
-#include "llvm/Support/TargetSelect.h"
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/InstIterator.h"
 
@@ -27,12 +20,7 @@
 #include <set>
 #include <vector>
 #include <utility>
-#include <string>
 #include <assert.h>
-#include <iostream>
-#include <cstdio>
-#include <dlfcn.h>
-#include <cxxabi.h>
 #include <algorithm>
 
 #include "vlbdb_impl.hpp"

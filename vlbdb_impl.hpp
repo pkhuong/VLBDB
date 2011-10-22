@@ -22,7 +22,6 @@ typedef binder_impl       vlbdb_binder_t;
 
 using namespace llvm;
 using std::map;
-using std::set;
 using std::vector;
 
 #define INTERNAL __attribute__((visibility("hidden")))
