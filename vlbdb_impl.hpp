@@ -26,7 +26,7 @@ using std::vector;
 
 #define INTERNAL __attribute__((visibility("hidden")))
 
-INTERNAL struct
+struct INTERNAL
 specialization_key_t : std::pair<Function *, vector<Value *> >
 {
         specialization_key_t ()
@@ -48,7 +48,7 @@ specialization_key_t : std::pair<Function *, vector<Value *> >
         }
 };
 
-INTERNAL struct specialization_info
+struct INTERNAL specialization_info
 {
         specialization_key_t key;
         size_t nauto_specialize;
@@ -65,17 +65,33 @@ INTERNAL struct specialization_info
 
 typedef std::tr1::shared_ptr<specialization_info> specialization_info_t;
 
-INTERNAL struct base_impl
+namespace StatusCode {
+        enum code {
+                OK = 0,
+                Deallocated,
+                InternalAssert,
+                BadAlloc,
+                BadBitcodeFile,
+                BadExecutionEngine,
+                NoNativeTarget,
+                RefCountOverflow,
+                ErrorLimit
+        };
+};
+
+struct INTERNAL base_impl
 {
         size_t refcount;
         int status;
+        const char * aux;
         explicit base_impl (size_t count = 1, int status_ = 0)
                 : refcount(count),
-                  status(status_)
+                  status(status_),
+                  aux(0)
         {}
 };
 
-INTERNAL struct binding_unit_impl : public base_impl
+struct INTERNAL binding_unit_impl : public base_impl
 {
         typedef vector<unsigned char> bytestring;
         LLVMContext * context;
@@ -101,7 +117,7 @@ INTERNAL struct binding_unit_impl : public base_impl
         {}
 };
 
-INTERNAL struct binder_impl  : public base_impl
+struct INTERNAL binder_impl  : public base_impl
 {
         binding_unit_impl * unit;
         Function * base;
@@ -129,7 +145,7 @@ INTERNAL struct binder_impl  : public base_impl
 
 // see http://clang.llvm.org/docs/Block-ABI-Apple.txt
 
-INTERNAL struct Block_literal {
+struct INTERNAL Block_literal {
         void *isa; // initialized to &_NSConcreteStackBlock or &_NSConcreteGlobalBlock
         int flags;
         int reserved; 
@@ -154,4 +170,41 @@ static bool exists (const Map &map, const Key &key)
 
 INTERNAL Function * 
 specialize_call (vlbdb_unit_t *, Function *, const vector<Value *> &);
+
+extern "C"
+base_impl *
+vlbdb_error_object(base_impl *, StatusCode::code code, const char * data = 0);
+
+#define XSTR(S) STR(S)
+#define STR(S) #S
+
+#define CHECK(TYPE, OBJ, CONDITION, CODE, STRING)                        \
+        do {                                                            \
+                if (!(CONDITION))                                       \
+                        return (TYPE*)vlbdb_error_object                \
+                                ((OBJ),                                 \
+                                 (CODE),                                \
+                                 "Check failed "                        \
+                                 STR(CONDITION)                         \
+                                 ", at "                                \
+                                 XSTR(__PRETTY_FUNCTION__)              \
+                                 " (" XSTR(__FILE__) ":"                \
+                                 XSTR(__LINE__) ") -- "                 \
+                                 STR(CODE)                              \
+                                 STRING);                               \
+        } while (0)
+
+#define CHECK_(OBJ, CONDITION, CODE, STRING)                            \
+        (!(CONDITION) ? ((void)vlbdb_error_object((OBJ),                \
+                                                  (CODE),               \
+                                                  "Check failed "       \
+                                                  STR(CONDITION)        \
+                                                  ", at "               \
+                                                  XSTR(__PRETTY_FUNCTION__) \
+                                                  " (" XSTR(__FILE__) ":" \
+                                                  XSTR(__LINE__) ") -- " \
+                                                  STR(CODE)             \
+                                                  STRING), 1)           \
+         : 0)
+
 #endif

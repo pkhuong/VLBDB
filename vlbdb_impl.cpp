@@ -41,7 +41,9 @@ static void retain_base (base_impl * obj)
         // sticky count
         if (obj->refcount == -1UL) return;
         // watch for overflow
-        assert(__sync_fetch_and_add(&obj->refcount, 1) != -1UL);
+        (void)CHECK_(obj, __sync_fetch_and_add(&obj->refcount, 1) != -1UL,
+                     StatusCode::RefCountOverflow,
+                     "Reference count field overflowed?!");
 }
 
 template <typename T>
@@ -62,26 +64,30 @@ vlbdb_unit_from_bitcode (const char * file, void * context_)
         if (!context) 
                 context = &getGlobalContext();
         SMDiagnostic error;
-        Module * module = ParseIRFile(file, error, *context);
-        if (!module) {
-                std::cerr << "Error " << error.getMessage() << std::endl;
-                exit(1);
-        }
+        Module * module;
+        CHECK(vlbdb_unit_t, 0,
+              (module = ParseIRFile(file, error, *context)),
+              StatusCode::BadBitcodeFile, "");
         std::string ErrStr;
         ExecutionEngine * engine = (EngineBuilder(module)
                                     .setErrorStr(&ErrStr)
                                     .setOptLevel(CodeGenOpt::Less)
                                     .setRelocationModel(Reloc::Static)
                                     .create());
-        if (!engine) {
-                fprintf(stderr, "Could not create ExecutionEngine: %s\n", ErrStr.c_str());
-                exit(1);
-        }
+        CHECK(vlbdb_unit_t, 0,
+              engine, StatusCode::BadExecutionEngine, "");
 
-        vlbdb_unit_t * unit = new vlbdb_unit_t(context, module, engine);
+        vlbdb_unit_t * unit;
+        CHECK(vlbdb_unit_t, 0,
+              (unit = new vlbdb_unit_t(context, module, engine)),
+              StatusCode::BadAlloc, ": unable to allocate unit");
 
         FunctionPassManager &fpm(unit->fpm);
-        fpm.add(new TargetData(*engine->getTargetData()));
+        TargetData * data;
+        CHECK(vlbdb_unit_t, unit,
+              (data = new TargetData(*engine->getTargetData())),
+              StatusCode::BadAlloc, ": unable to allocate TargetData");
+        fpm.add(data);
         //fpm.add(createPromoteMemoryToRegisterPass());
         fpm.add(createSCCPPass());
         fpm.add(createAggressiveDCEPass());
@@ -150,7 +156,7 @@ vlbdb_register_all_functions (vlbdb_unit_t * unit)
                 Function * fun = &*it;
                 if (fun->isDeclaration()) continue;
                 if (!fun->hasExternalLinkage()) continue;
-                std::string name(it->getNameStr());
+                std::string name(it->getName());
                 const char * cname = name.c_str();
                 if (void * function = dlsym(RTLD_DEFAULT, cname))
                         vlbdb_register_function(unit, function, 0, cname);
@@ -331,4 +337,13 @@ void * vlbdb_specialize_retain (vlbdb_binder_t * binder)
         void * binary = unit->engine->getPointerToFunction(specialized);
         unit->ptr_to_function[binary] = specialized;
         return binary;
+}
+
+#include <stdio.h>
+
+base_impl *
+vlbdb_error_object(base_impl *, StatusCode::code code, const char * data)
+{
+        printf("error: %s %i\n", data, code);
+        return NULL;
 }

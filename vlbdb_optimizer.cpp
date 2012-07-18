@@ -443,6 +443,7 @@ inline_call_or_not (vlbdb_unit_t * unit, CallInst * call,
 {
         specialization_info_t info(find_specialization_info
                                    (unit, call->getCalledFunction()));
+        return info;
         return (info && exists(targets, info->key.first));
 }
 
